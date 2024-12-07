@@ -1,6 +1,7 @@
 import pandas as pd
 import sqlite3
 import csv
+import os
 from tkinter import Tk
 from tkinter.filedialog import askopenfilename, asksaveasfilename
 
@@ -28,9 +29,13 @@ from tkinter.filedialog import askopenfilename, asksaveasfilename
 # print(f"Subset saved to {output_file}")
 
 #sqlite setup 
+
+# Get the directory of the current script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
 # Define the CSV file and database file
-csv_file = '/Users/danielli/Desktop/Rutgers/codes/dataManagement/vehicleSample.csv'  # Replace with your CSV file path
-database_file = 'car_data.db'  # SQLite database file
+csv_file = os.path.join(script_dir, 'vehicleSample.csv')  # Dynamically find the CSV file in the same directory
+database_file = os.path.join(script_dir, 'car_data.db')   # SQLite database file in the same directory
 
 # Connect to SQLite (creates the database file if it doesn't exist)
 conn = sqlite3.connect(database_file)
@@ -86,4 +91,3 @@ conn.commit()
 conn.close()
 
 print(f"Data from {csv_file} has been successfully imported into {database_file}.")
-
