@@ -29,7 +29,7 @@ from tkinter.filedialog import askopenfilename, asksaveasfilename
 
 #sqlite setup 
 # Define the CSV file and database file
-csv_file = '/Users/danielli/Desktop/Rutgers/codes/dataManagement/carFinder.csv'  # Replace with your CSV file path
+csv_file = '/Users/danielli/Desktop/Rutgers/codes/dataManagement/vehicleSample.csv'  # Replace with your CSV file path
 database_file = 'car_data.db'  # SQLite database file
 
 # Connect to SQLite (creates the database file if it doesn't exist)
