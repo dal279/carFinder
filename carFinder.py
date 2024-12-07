@@ -41,36 +41,46 @@ database_file = os.path.join(script_dir, 'car_data.db')   # SQLite database file
 conn = sqlite3.connect(database_file)
 cursor = conn.cursor()
 
-# Create the table with the specified columns
-table_name = 'car_listings'  # Replace with your table name
-cursor.execute(f"""
-    CREATE TABLE IF NOT EXISTS {table_name} (
-        id INTEGER PRIMARY KEY,
-        url TEXT,
-        region TEXT,
-        region_url TEXT,
-        price REAL,
-        year INTEGER,
-        manufacturer TEXT,
-        model TEXT,
-        condition TEXT,
-        cylinders TEXT,
-        fuel TEXT,
-        odometer REAL,
-        title_status TEXT,
-        transmission TEXT,
-        VIN TEXT,
-        drive TEXT,
-        size TEXT,
-        type TEXT,
-        paint_color TEXT,
-        image_url TEXT,
-        state TEXT,
-        lat REAL,
-        long REAL,
-        posting_date TEXT
-    );
+# Check if the table already exists
+cursor.execute("""
+    SELECT name FROM sqlite_master WHERE type='table' AND name='car_listings';
 """)
+table_exists = cursor.fetchone()
+
+# Only create the table if it doesn't exist
+if not table_exists:
+    print("Initializing database...")
+    cursor.execute(f"""
+        CREATE TABLE IF NOT EXISTS car_listings (
+            id INTEGER PRIMARY KEY,
+            url TEXT,
+            region TEXT,
+            region_url TEXT,
+            price REAL,
+            year INTEGER,
+            manufacturer TEXT,
+            model TEXT,
+            condition TEXT,
+            cylinders TEXT,
+            fuel TEXT,
+            odometer REAL,
+            title_status TEXT,
+            transmission TEXT,
+            VIN TEXT,
+            drive TEXT,
+            size TEXT,
+            type TEXT,
+            paint_color TEXT,
+            image_url TEXT,
+            state TEXT,
+            lat REAL,
+            long REAL,
+            posting_date TEXT
+        );
+    """)
+    print("Table created.")
+else:
+    print("Database already initialized. Skipping table creation.")
 
 # Open the CSV file and insert its data into the SQLite database
 with open(csv_file, 'r', encoding='utf-8') as file:
@@ -79,7 +89,7 @@ with open(csv_file, 'r', encoding='utf-8') as file:
     # Prepare the insert statement dynamically based on CSV columns
     placeholders = ', '.join(['?' for _ in reader.fieldnames])
     columns = ', '.join(reader.fieldnames)
-    insert_query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders});"
+    insert_query = f"INSERT OR IGNORE INTO car_listings ({columns}) VALUES ({placeholders});"
 
     # Insert rows into the table
     for row in reader:
