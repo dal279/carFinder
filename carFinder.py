@@ -9,13 +9,15 @@ input_file = askopenfilename(title="Select Input CSV File", filetypes=[("CSV Fil
 
 # Load the CSV file
 df = pd.read_csv(input_file)
-columns_to_drop = ["description"]
-df_dropped = df.drop(columns=columns_to_drop)
 
+#clean CSV file
+columns_to_drop = ["description","county"]
+df_dropped = df.drop(columns=columns_to_drop)
 df_cleaned = df_dropped.dropna()
 
+
 # Randomly select a subset
-subset = df_cleaned.sample(n=1000, random_state=42)
+subset = df_cleaned.sample(n= 500, random_state=42)
 
 # Open a file dialog to save the output file
 output_file = asksaveasfilename(title="Save Reduced CSV As", defaultextension=".csv", filetypes=[("CSV Files", "*.csv")])
