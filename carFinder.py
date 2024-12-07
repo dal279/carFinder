@@ -9,29 +9,6 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 import numpy as np
 
-# # csv file condenser 
-# # Open a file dialog to select the input file
-# Tk().withdraw()  # Close the root window
-# input_file = askopenfilename(title="Select Input CSV File", filetypes=[("CSV Files", "*.csv")])
-
-# # Load the CSV file
-# df = pd.read_csv(input_file)
-
-# #clean CSV file
-# columns_to_drop = ["description","county"]
-# df_dropped = df.drop(columns=columns_to_drop)
-# df_cleaned = df_dropped.dropna()
-
-
-# # Randomly select a subset
-# subset = df_cleaned.sample(n= 500, random_state=42)
-
-# # Open a file dialog to save the output file
-# output_file = asksaveasfilename(title="Save Reduced CSV As", defaultextension=".csv", filetypes=[("CSV Files", "*.csv")])
-# subset.to_csv(output_file, index=False)
-
-# print(f"Subset saved to {output_file}")
-
 #sqlite setup 
 
 # Get the directory of the current script
@@ -130,40 +107,55 @@ print(f"You selected: {selected_manufacturer}")
 # Fetch data for the selected manufacturer
 conn = sqlite3.connect(database_file)
 query = f"""
-    SELECT price, manufacturer FROM car_listings
+    SELECT price, manufacturer, year, odometer FROM car_listings
     WHERE manufacturer = ? AND price IS NOT NULL;
 """
 df = pd.read_sql_query(query, conn, params=(selected_manufacturer,))
 conn.close()
 
+print(df.head())  # Debug: Inspect the data
+print(f"Number of rows: {len(df)}")
+
 # Ensure data is sufficient
 if len(df) < 10:
     print("Not enough data available for this manufacturer to train a reliable model.")
-else:
-    # Prepare data for Linear Regression
-    X = pd.get_dummies(df['manufacturer'], drop_first=True)  # One-hot encode manufacturer (though it's single-valued here)
-    y = df['price']
+    exit()
 
-    # Split data into training and test sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Prepare data for Linear Regression
+X = df[['year', 'odometer']]  # Include additional features
+y = df['price']
 
-    # Train Linear Regression model
-    model = LinearRegression()
-    model.fit(X_train, y_train)
+# Check for empty or invalid data
+if X.empty or y.empty:
+    print("No valid data for training.")
+    exit()
 
-    # Evaluate the model
-    y_pred = model.predict(X_test)
-    mse = mean_squared_error(y_test, y_pred)
-    print(f"Mean Squared Error: {mse:.2f}")
+# Split data into training and test sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Ask the user for prediction input
-    print("Training complete. Ready to predict prices.")
-    while True:
-        prediction_input = input("Enter a value to estimate (or type 'exit' to quit): ").strip()
-        if prediction_input.lower() == 'exit':
-            break
+# Train the Linear Regression model
+model = LinearRegression()
+model.fit(X_train, y_train)
 
-        # Since we are one-hot encoding, predictions for this simple example are trivial
-        # In a real-world scenario, the manufacturer choice is implicit
-        prediction = model.predict([[1]])  # Hardcoded as only one manufacturer remains after filtering
-        print(f"Estimated price for {selected_manufacturer}: ${prediction[0]:.2f}")
+# Evaluate the model
+y_pred = model.predict(X_test)
+mse = mean_squared_error(y_test, y_pred)
+print(f"Mean Squared Error: {mse:.2f}")
+
+# Ask the user for prediction input
+print("Training complete. Ready to predict prices.")
+while True:
+    prediction_input_year = input("Enter the year of the vehicle: ").strip()
+    prediction_input_odometer = input("Enter the mileage of the vehicle: ").strip()
+
+    try:
+        prediction_input = pd.DataFrame({
+            'year': [int(prediction_input_year)],
+            'odometer': [float(prediction_input_odometer)]
+        })
+
+        prediction = model.predict(prediction_input)
+        print(f"Estimated price: ${prediction[0]:.2f}")
+    except Exception as e:
+        print(f"Error: {e}")
+        break
