@@ -2,12 +2,20 @@ import pandas as pd
 import sqlite3
 import os
 import hashlib
+import json
 from tkinter import Tk, Label, Entry, Button, StringVar, IntVar, ttk, messagebox
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 
-# Function to calculate the hash of the CSV file
+# Paths for dataset and metadata
+script_dir = os.path.dirname(os.path.abspath(__file__))
+csv_file = os.path.join(script_dir, 'vehicleSample10000.csv')  # Cleaned CSV file
+metadata_file = os.path.join(script_dir, 'vehicleSample10000_metadata.json')  # Metadata JSON file
+database_file = os.path.join(script_dir, 'car_data.db')  # SQLite database file
+
+
+# Function to calculate the hash of a file
 def calculate_file_hash(file_path):
     """Calculate the hash of the file contents."""
     hasher = hashlib.sha256()
@@ -16,72 +24,46 @@ def calculate_file_hash(file_path):
             hasher.update(chunk)
     return hasher.hexdigest()
 
-# Function to dynamically create a table from a CSV file
-def create_table_from_csv(csv_file, conn, table_name):
-    """Create a table in the database from a CSV file."""
-    df = pd.read_csv(csv_file)
-    # Write the DataFrame to the database as a new table
-    df.to_sql(table_name, conn, if_exists='replace', index=False)
-    print(f"Table '{table_name}' created or updated in the database.")
 
-# SQLite database and CSV setup
-script_dir = os.path.dirname(os.path.abspath(__file__))
-csv_file = os.path.join(script_dir, 'vehicleSample10000.csv')  # CSV file path
-database_file = os.path.join(script_dir, 'car_data.db')   # SQLite database file path
+# Function to initialize the database
+def initialize_database():
+    """Initialize or update the database if the CSV file has changed."""
+    conn = sqlite3.connect(database_file)
+    cursor = conn.cursor()
 
-# Connect to SQLite database
-conn = sqlite3.connect(database_file)
-cursor = conn.cursor()
+    # Check if the metadata table exists to store the hash
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS metadata (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        );
+    """)
 
-# Check if the metadata table exists to store the hash
-cursor.execute("""
-    CREATE TABLE IF NOT EXISTS metadata (
-        key TEXT PRIMARY KEY,
-        value TEXT
-    );
-""")
+    # Calculate the hash of the CSV file
+    csv_hash = calculate_file_hash(csv_file)
 
-# Calculate the hash of the CSV file
-csv_hash = calculate_file_hash(csv_file)
+    # Check the stored hash in the metadata table
+    cursor.execute("SELECT value FROM metadata WHERE key = 'csv_hash';")
+    row = cursor.fetchone()
+    stored_hash = row[0] if row else None
 
-# Check the stored hash in the metadata table
-cursor.execute("SELECT value FROM metadata WHERE key = 'csv_hash';")
-row = cursor.fetchone()
-stored_hash = row[0] if row else None
+    if csv_hash != stored_hash:
+        print("CSV file has changed. Recreating the table...")
 
-if csv_hash != stored_hash:
-    print("CSV file has changed. Recreating the table...")
+        # Dynamically create the table from the CSV file
+        df = pd.read_csv(csv_file)
+        df.to_sql('car_listings', conn, if_exists='replace', index=False)
 
-    # Dynamically create the table from the CSV file
-    create_table_from_csv(csv_file, conn, 'car_listings')
+        # Update the stored hash in the metadata table
+        cursor.execute("INSERT OR REPLACE INTO metadata (key, value) VALUES ('csv_hash', ?);", (csv_hash,))
 
-    # Update the stored hash in the metadata table
-    cursor.execute("INSERT OR REPLACE INTO metadata (key, value) VALUES ('csv_hash', ?);", (csv_hash,))
+        print(f"Table recreated and CSV data imported into {database_file}.")
+    else:
+        print("CSV file has not changed. Skipping table recreation.")
 
-    print(f"Table recreated and CSV data imported into {database_file}.")
-else:
-    print("CSV file has not changed. Skipping table recreation.")
+    conn.commit()
+    conn.close()
 
-# Commit changes and close the connection
-conn.commit()
-conn.close()
-
-# Fetch unique values for dropdowns
-conn = sqlite3.connect(database_file)
-cursor = conn.cursor()
-cursor.execute("SELECT DISTINCT manufacturer FROM car_listings WHERE manufacturer IS NOT NULL;")
-manufacturers = sorted([row[0] for row in cursor.fetchall()])
-cursor.execute("SELECT DISTINCT model FROM car_listings WHERE model IS NOT NULL;")
-models = sorted([row[0] for row in cursor.fetchall()])
-cursor.execute("SELECT DISTINCT fuel FROM car_listings WHERE fuel IS NOT NULL;")
-fuels = [row[0] for row in cursor.fetchall()]
-cursor.execute("SELECT DISTINCT transmission FROM car_listings WHERE transmission IS NOT NULL;")
-transmissions = [row[0] for row in cursor.fetchall()]
-cursor.execute("SELECT DISTINCT drive FROM car_listings WHERE drive IS NOT NULL;")
-drives = [row[0] for row in cursor.fetchall()]
-cursor.execute("SELECT DISTINCT type FROM car_listings WHERE type IS NOT NULL;")
-types = [row[0] for row in cursor.fetchall()]
-conn.close()
 
 # Function to fetch models for a specific manufacturer
 def fetch_models(manufacturer):
@@ -95,6 +77,7 @@ def fetch_models(manufacturer):
     conn.close()
     return models
 
+
 # Function to update the model dropdown based on the selected manufacturer
 def update_model_dropdown(*args):
     """Update the model dropdown options when the manufacturer changes."""
@@ -104,10 +87,22 @@ def update_model_dropdown(*args):
         model_dropdown['values'] = models  # Update the dropdown values
         model_var.set('')  # Clear the current selection
 
+
+# Load metadata for dropdowns
+with open(metadata_file, 'r') as f:
+    metadata = json.load(f)
+
+manufacturers = metadata['manufacturer']
+fuels = metadata['fuel']
+transmissions = metadata['transmission']
+drives = metadata['drive']
+types = metadata['type']
+
+
 # Tkinter GUI setup
 root = Tk()
 root.title("Car Price Predictor")
-root.geometry("400x500")  # Adjusted for additional dropdown
+root.geometry("400x500")
 
 # Input Variables
 manufacturer_var = StringVar()
@@ -147,7 +142,7 @@ create_dropdown("Type:", types, type_var, 8)
 # Bind the manufacturer dropdown to update the model dropdown
 manufacturer_var.trace("w", update_model_dropdown)
 
-# Prediction function (unchanged)
+# Prediction function
 def predict_price():
     user_inputs = {
         "manufacturer": manufacturer_var.get(),
@@ -166,19 +161,16 @@ def predict_price():
 
     # Connect to SQLite and fetch data
     conn = sqlite3.connect(database_file)
-    query = """
-        SELECT price, manufacturer, model, year, condition, odometer, fuel, transmission, drive, type 
-        FROM car_listings WHERE price IS NOT NULL;
-    """
+    query = "SELECT * FROM car_listings WHERE price IS NOT NULL;"
     df = pd.read_sql_query(query, conn)
     conn.close()
 
-    # Check if sufficient data exists
+    # Ensure sufficient data exists
     if len(df) < 10:
         messagebox.showerror("Error", "Not enough data to create a reliable model.")
         return
 
-    # Calculate similarity scores
+    # Train the model based on similarity
     def calculate_similarity_score(row, user_inputs):
         score = 0
         for key, value in user_inputs.items():
@@ -189,13 +181,11 @@ def predict_price():
     df['similarity_score'] = df.apply(calculate_similarity_score, axis=1, args=(filtered_inputs,))
     df = df.sort_values(by='similarity_score', ascending=False)
 
-    # Select top similar records
     top_similar_records = df[df['similarity_score'] > 0].head(100)
     if len(top_similar_records) < 10:
         messagebox.showerror("Error", "Not enough similar data to make a reliable prediction.")
         return
 
-    # Train the model
     features = ['manufacturer', 'model', 'year', 'condition', 'odometer', 'fuel', 'transmission', 'drive', 'type']
     X = pd.get_dummies(top_similar_records[features], drop_first=True)
     y = top_similar_records['price']
@@ -203,12 +193,10 @@ def predict_price():
     model = LinearRegression()
     model.fit(X_train, y_train)
 
-    # Prepare user input for prediction
     user_df = pd.DataFrame([filtered_inputs])
     user_df = pd.get_dummies(user_df, drop_first=True)
     user_df = user_df.reindex(columns=X_train.columns, fill_value=0)
 
-    # Predict and show result
     try:
         prediction = model.predict(user_df)
         messagebox.showinfo("Prediction", f"Estimated price: ${prediction[0]:.2f}")
