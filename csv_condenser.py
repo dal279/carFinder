@@ -21,7 +21,7 @@ def main():
     df_cleaned = df_dropped.dropna()
 
     # Randomly select a subset
-    subset = df_cleaned.sample(n=500, random_state=42)
+    subset = df_cleaned.sample(n=10000, random_state=42)
 
     # Save the subset to a new file
     output_file = asksaveasfilename(title="Save Reduced CSV As", defaultextension=".csv", filetypes=[("CSV Files", "*.csv")])
