@@ -9,7 +9,6 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
 from difflib import SequenceMatcher  # For string similarity
 
-
 # Paths for dataset and metadata
 script_dir = os.path.dirname(os.path.abspath(__file__))
 csv_file = os.path.join(script_dir, 'vehicleSample100k.csv')  # Cleaned CSV file
@@ -24,7 +23,6 @@ def calculate_file_hash(file_path):
         while chunk := f.read(8192):
             hasher.update(chunk)
     return hasher.hexdigest()
-
 
 # Function to initialize the database
 def initialize_database():
@@ -65,7 +63,6 @@ def initialize_database():
     conn.commit()
     conn.close()
 
-
 # Function to fetch models for a specific manufacturer
 def fetch_models(manufacturer):
     """Fetch models from the database for the selected manufacturer."""
@@ -78,7 +75,6 @@ def fetch_models(manufacturer):
     conn.close()
     return models
 
-
 # Function to update the model dropdown based on the selected manufacturer
 def update_model_dropdown(*args):
     """Update the model dropdown options when the manufacturer changes."""
@@ -87,7 +83,6 @@ def update_model_dropdown(*args):
         models = fetch_models(selected_manufacturer)
         model_dropdown['values'] = models  # Update the dropdown values
         model_var.set('')  # Clear the current selection
-
 
 # Load metadata for dropdowns
 with open(metadata_file, 'r') as f:
@@ -189,8 +184,6 @@ def predict_price():
         return
 
     # Train the model based on similarity
-    from difflib import SequenceMatcher  # For string similarity
-
     df['similarity_score'] = df.apply(calculate_similarity_score, axis=1, args=(filtered_inputs,))
     df = df.sort_values(by='similarity_score', ascending=False)
 
@@ -211,16 +204,29 @@ def predict_price():
     user_df = user_df.reindex(columns=X_train.columns, fill_value=0)
 
     try:
-        prediction = model.predict(user_df)
-        similar_cars = top_similar_records[['manufacturer', 'model', 'year', 'price']].head(10)
-        
+        prediction = model.predict(user_df)[0]
+
+        # Filter for cars with prices similar to the predicted price
+        price_range = 0.2 * prediction  # ±20% of the predicted price
+        similar_priced_cars = df[
+            (df['price'] >= prediction - price_range) &
+            (df['price'] <= prediction + price_range)
+        ]
+
+        # Combine similarity and price filtering
+        recommended_cars = similar_priced_cars.sort_values(
+            by=['similarity_score'], ascending=False
+        ).head(10)
+
+        # Generate a list of recommended cars
         similar_cars_list = "\n".join(
             f"{row['year']} {row['manufacturer']} {row['model']}: ${row['price']:.2f}"
-            for _, row in similar_cars.iterrows()
+            for _, row in recommended_cars.iterrows()
         )
+
         messagebox.showinfo(
             "Prediction",
-            f"Estimated price: ${prediction[0]:.2f}\n\nSimilar cars:\n{similar_cars_list}"
+            f"Estimated price: ${prediction:.2f}\n\nSimilar cars:\n{similar_cars_list}"
         )
     except Exception as e:
         messagebox.showerror("Error", f"Error during prediction: {e}")
