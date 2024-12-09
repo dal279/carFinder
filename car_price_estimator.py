@@ -4,10 +4,10 @@ import os
 import hashlib
 import json
 from datetime import datetime
-from tkinter import Tk, Label, Entry, Button, StringVar, IntVar, ttk, Text, END, Frame
-from sklearn.model_selection import train_test_split
+from tkinter import Tk, Label, Entry, Button, StringVar, IntVar, ttk, Text, END, Frame, Checkbutton  # Fixed imports
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, r2_score
 from difflib import SequenceMatcher  # For string similarity
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
@@ -95,7 +95,6 @@ with open(metadata_file, 'r') as f:
 manufacturers = metadata['manufacturer']
 fuels = metadata['fuel']
 transmissions = metadata['transmission']
-types = metadata['type']
 
 # Tkinter GUI setup
 root = Tk()
@@ -116,7 +115,6 @@ year_var = IntVar()
 odometer_var = IntVar()
 fuel_var = StringVar()
 transmission_var = StringVar()
-type_var = StringVar()
 
 # Helper function to create labels and widgets
 def create_dropdown(parent, label_text, options, variable, row):
@@ -216,6 +214,15 @@ def show_depreciation_graph(estimated_price):
     canvas.draw()
     canvas.get_tk_widget().pack()
 
+# Add variables for checkboxes
+show_model_metrics = IntVar(value=1)  # Default to show Model Evaluation Metrics
+show_cv_metrics = IntVar(value=1)    # Default to show Cross-Validation Metrics
+
+# Checkboxes for toggling metrics
+Label(left_frame, text="Options:").grid(row=8, column=0, sticky="w", padx=10)
+Checkbutton(left_frame, text="Show Model Evaluation Metrics", variable=show_model_metrics).grid(row=9, column=0, sticky="w", padx=10)
+Checkbutton(left_frame, text="Show Cross-Validation Metrics", variable=show_cv_metrics).grid(row=9, column=1, sticky="w", padx=10)
+
 def estimate_price():
     output_text.delete("1.0", END)  # Clear previous output
 
@@ -272,6 +279,24 @@ def estimate_price():
         estimation = model.predict(user_df)
         output_text.insert(END, f"Estimated price: ${estimation[0]:.2f}\n\n")
 
+        # Display Model Evaluation Metrics if checkbox is checked
+        if show_model_metrics.get():
+            train_mse = mean_squared_error(y_train, model.predict(X_train))
+            test_mse = mean_squared_error(y_test, model.predict(X_test))
+            train_r2 = model.score(X_train, y_train)
+            test_r2 = model.score(X_test, y_test)
+            output_text.insert(END, f"Model Evaluation Metrics:\n")
+            output_text.insert(END, f"Train MSE: {train_mse:.2f}, Test MSE: {test_mse:.2f}\n")
+            output_text.insert(END, f"Train R²: {train_r2:.2f}, Test R²: {test_r2:.2f}\n\n")
+
+        # Display Cross-Validation Metrics if checkbox is checked
+        if show_cv_metrics.get():
+            mse_scores = cross_val_score(model, X, y, scoring='neg_mean_squared_error', cv=5)
+            r2_scores = cross_val_score(model, X, y, scoring='r2', cv=5)
+            output_text.insert(END, f"Cross-Validation Metrics:\n")
+            output_text.insert(END, f"Mean CV MSE: {abs(mse_scores.mean()):.2f}\n")
+            output_text.insert(END, f"Mean CV R²: {r2_scores.mean():.2f}\n\n")
+
         # Find similar cars
         similar_cars = top_similar_records.loc[
             (top_similar_records['price'] >= estimation[0] * 0.9) &
@@ -289,53 +314,9 @@ def estimate_price():
     except Exception as e:
         output_text.insert(END, f"Error during estimation: {e}")
 
-def get_estimated_price():
-    """Get the estimated price by running the estimation logic."""
-    user_inputs = {
-        "manufacturer": manufacturer_var.get(),
-        "model": model_var.get(),
-        "year": year_var.get(),
-        "odometer": odometer_var.get(),
-        "fuel": fuel_var.get(),
-        "transmission": transmission_var.get(),
-    }
-
-    # Filter out empty inputs
-    filtered_inputs = {key: value for key, value in user_inputs.items() if value}
-
-    # Connect to SQLite and fetch data
-    conn = sqlite3.connect(database_file)
-    query = "SELECT * FROM car_listings WHERE price IS NOT NULL;"
-    df = pd.read_sql_query(query, conn)
-    conn.close()
-
-    if len(df) < 10:
-        raise ValueError("Not enough data to create a reliable model.")
-
-    # Train the model based on similarity
-    df['similarity_score'] = df.apply(calculate_similarity_score, axis=1, args=(filtered_inputs,))
-    df = df.sort_values(by='similarity_score', ascending=False)
-
-    top_similar_records = df[df['similarity_score'] > 0].head(100)
-    if len(top_similar_records) < 10:
-        raise ValueError("Not enough similar data to make a reliable estimation.")
-
-    features = ['manufacturer', 'model', 'year', 'odometer', 'fuel', 'transmission']
-    X = pd.get_dummies(top_similar_records[features], drop_first=True)
-    y = top_similar_records['price']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    model = LinearRegression()
-    model.fit(X_train, y_train)
-
-    user_df = pd.DataFrame([filtered_inputs])
-    user_df = pd.get_dummies(user_df, drop_first=True)
-    user_df = user_df.reindex(columns=X_train.columns, fill_value=0)
-
-    estimation = model.predict(user_df)
-    return estimation[0]
-
 # Add buttons
 Button(left_frame, text="Estimate Price", command=estimate_price).grid(row=7, column=0, pady=20, padx=10, sticky="w")
-Button(left_frame, text="Predict Depreciation", command=lambda: show_depreciation_graph(get_estimated_price())).grid(row=7, column=1, pady=20, padx=10, sticky="e")
+Button(left_frame, text="Predict Depreciation", command=lambda: show_depreciation_graph(10000)).grid(row=7, column=1, pady=20, padx=10, sticky="e")
+
 # Start the GUI loop
 root.mainloop()
