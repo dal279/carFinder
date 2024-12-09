@@ -61,15 +61,30 @@ def main():
     # Load the CSV file
     df = pd.read_csv(input_file)
 
+    # Ensure posting_date exists and is in datetime format
+    if 'posting_date' in df.columns:
+        df['posting_date'] = pd.to_datetime(df['posting_date'], errors='coerce')
+        df = df.dropna(subset=['posting_date'])  # Drop rows with invalid dates
+        df = df.sort_values(by='posting_date', ascending=False)  # Sort by recent first
+
     # Clean the data
     print("Cleaning the data...")
     df_cleaned = clean_data(df)
 
-    # Extract metadata
-    metadata = extract_metadata(df_cleaned)
+    # Split into most recent (70%) and oldest (30%)
+    recent_records = df_cleaned.head(200000)
+    oldest_records = recent_records.tail(int(0.3 * len(recent_records)))
+    recent_records = recent_records.head(int(0.7 * len(recent_records)))
 
-    # Randomly select a subset
-    subset = df_cleaned.sample(n=100000, random_state=42) if len(df_cleaned) > 100000 else df_cleaned
+    # Randomly sample 70% from recent and 30% from oldest
+    recent_sample = recent_records.sample(n=int(0.7 * 100000), random_state=42) if len(recent_records) > int(0.7 * 100000) else recent_records
+    oldest_sample = oldest_records.sample(n=int(0.3 * 100000), random_state=42) if len(oldest_records) > int(0.3 * 100000) else oldest_records
+
+    # Combine the samples
+    subset = pd.concat([recent_sample, oldest_sample]).sample(frac=1, random_state=42)  # Shuffle the combined sample
+
+    # Extract metadata
+    metadata = extract_metadata(subset)
 
     # Save the subset to a new file
     output_file = asksaveasfilename(title="Save Reduced CSV As", defaultextension=".csv", filetypes=[("CSV Files", "*.csv")])
