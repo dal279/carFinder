@@ -3,6 +3,7 @@ import sqlite3
 import os
 import hashlib
 import json
+from datetime import datetime
 from tkinter import Tk, Label, Entry, Button, StringVar, IntVar, ttk, Text, END, Frame
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
@@ -175,15 +176,16 @@ def show_depreciation_graph(estimated_price):
     for widget in graph_frame.winfo_children():
         widget.destroy()
 
-    years = list(range(0, 11))
-    depreciation_rates = [0.9 ** year for year in years]  # Example depreciation rates
+    current_year = datetime.now().year
+    years = [current_year + i for i in range(11)]
+    depreciation_rates = [0.9 ** i for i in range(11)]  # Example depreciation rates
     prices = [estimated_price * rate for rate in depreciation_rates]
 
     # Create the figure
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.plot(years, prices, marker='o', label="Depreciation Curve")
     ax.set_title("Depreciation Over 10 Years")
-    ax.set_xlabel("Years")
+    ax.set_xlabel("Year")
     ax.set_ylabel("Price ($)")
     ax.legend()
 
@@ -194,13 +196,12 @@ def show_depreciation_graph(estimated_price):
     def on_add(sel):
         # Update the hover label with x and y-axis labels
         x, y = sel.target
-        sel.annotation.set_text(f"Years: {x:.0f}\nPrice: ${y:.2f}")
+        sel.annotation.set_text(f"Year: {int(x)}\nPrice: ${y:.2f}")
 
     # Embed the graph into Tkinter
     canvas = FigureCanvasTkAgg(fig, master=graph_frame)
     canvas.draw()
     canvas.get_tk_widget().pack()
-
 
 def estimate_price():
     output_text.delete("1.0", END)  # Clear previous output
