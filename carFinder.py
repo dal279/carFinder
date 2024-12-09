@@ -190,7 +190,16 @@ def predict_price():
 
     try:
         prediction = model.predict(user_df)
-        messagebox.showinfo("Prediction", f"Estimated price: ${prediction[0]:.2f}")
+        similar_cars = top_similar_records[['manufacturer', 'model', 'year', 'price']].head(10)
+        
+        similar_cars_list = "\n".join(
+            f"{row['year']} {row['manufacturer']} {row['model']}: ${row['price']:.2f}"
+            for _, row in similar_cars.iterrows()
+        )
+        messagebox.showinfo(
+            "Prediction",
+            f"Estimated price: ${prediction[0]:.2f}\n\nSimilar cars:\n{similar_cars_list}"
+        )
     except Exception as e:
         messagebox.showerror("Error", f"Error during prediction: {e}")
 
