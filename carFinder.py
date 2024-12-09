@@ -132,8 +132,8 @@ create_dropdown("Transmission:", transmissions, transmission_var, 6)
 manufacturer_var.trace("w", update_model_dropdown)
 
 def calculate_string_similarity(str1, str2):
-    """Calculate string similarity using SequenceMatcher."""
-    return SequenceMatcher(None, str1, str2).ratio()
+        """Calculate string similarity using SequenceMatcher."""
+        return SequenceMatcher(None, str1, str2).ratio()
 
 def calculate_similarity_score(row, user_inputs):
     """Calculate a similarity score for each row based on user inputs."""
@@ -157,18 +157,6 @@ def calculate_similarity_score(row, user_inputs):
                 score += weights[key]
 
     return score
-
-# Function to find similar cars
-def find_similar_cars(predicted_price, selected_model, car_type, df):
-    """Find similar cars based on type and price, excluding the selected model."""
-    similar_cars = df.loc[
-        (df['type'] == car_type) &  # Same car type
-        (df['model'].str.lower() != selected_model.lower()) &  # Exclude the same model
-        (df['price'] >= predicted_price * 0.9) &
-        (df['price'] <= predicted_price * 1.1),
-        ['manufacturer', 'model', 'year', 'price']
-    ]
-    return similar_cars
 
 # Output Area
 output_text = Text(root, wrap="word", height=15, width=50)
@@ -223,21 +211,17 @@ def predict_price():
 
     try:
         prediction = model.predict(user_df)
-        predicted_price = prediction[0]
+        similar_cars = top_similar_records.loc[
+            (top_similar_records['price'] >= prediction[0] * 0.9) &
+            (top_similar_records['price'] <= prediction[0] * 1.1),
+            ['manufacturer', 'model', 'year', 'price']
+        ]
 
-        # Display prediction
-        output_text.insert(END, f"Estimated price: ${predicted_price:.2f}\n\n")
+        output_text.insert(END, f"Estimated price: ${prediction[0]:.2f}\n\n")
+        output_text.insert(END, "Similar cars:\n")
 
-        # Find and display similar cars
-        car_type = df.loc[df['model'] == filtered_inputs['model'], 'type'].iloc[0] if 'model' in filtered_inputs else None
-        if car_type:
-            similar_cars = find_similar_cars(predicted_price, filtered_inputs['model'], car_type, df)
-            if not similar_cars.empty:
-                output_text.insert(END, "Similar cars:\n")
-                for _, row in similar_cars.iterrows():
-                    output_text.insert(END, f"{row['year']} {row['manufacturer']} {row['model']}: ${row['price']:.2f}\n")
-            else:
-                output_text.insert(END, "No similar cars found within the price range.\n")
+        for _, row in similar_cars.iterrows():
+            output_text.insert(END, f"{row['year']} {row['manufacturer']} {row['model']}: ${row['price']:.2f}\n")
 
     except Exception as e:
         output_text.insert(END, f"Error during prediction: {e}")
