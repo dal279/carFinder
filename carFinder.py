@@ -100,7 +100,14 @@ types = metadata['type']
 # Tkinter GUI setup
 root = Tk()
 root.title("Car Price Estimator")
-root.geometry("800x800")
+root.geometry("1200x600")  # Resized default window to fit both inputs and graph
+
+# Main container frames
+left_frame = Frame(root)  # For inputs and output text
+left_frame.grid(row=0, column=0, padx=10, pady=10, sticky="n")
+
+right_frame = Frame(root)  # For the graph
+right_frame.grid(row=0, column=1, padx=10, pady=10, sticky="n")
 
 # Input Variables
 manufacturer_var = StringVar()
@@ -112,25 +119,25 @@ transmission_var = StringVar()
 type_var = StringVar()
 
 # Helper function to create labels and widgets
-def create_dropdown(label_text, options, variable, row):
-    Label(root, text=label_text).grid(row=row, column=0, sticky="w", padx=10, pady=5)
-    dropdown = ttk.Combobox(root, textvariable=variable, values=options, state="readonly")
+def create_dropdown(parent, label_text, options, variable, row):
+    Label(parent, text=label_text).grid(row=row, column=0, sticky="w", padx=10, pady=5)
+    dropdown = ttk.Combobox(parent, textvariable=variable, values=options, state="readonly")
     dropdown.grid(row=row, column=1, padx=10, pady=5)
     return dropdown
 
-def create_input(label_text, variable, row):
-    Label(root, text=label_text).grid(row=row, column=0, sticky="w", padx=10, pady=5)
-    entry = Entry(root, textvariable=variable)
+def create_input(parent, label_text, variable, row):
+    Label(parent, text=label_text).grid(row=row, column=0, sticky="w", padx=10, pady=5)
+    entry = Entry(parent, textvariable=variable)
     entry.grid(row=row, column=1, padx=10, pady=5)
     return entry
 
-# Create GUI elements
-create_dropdown("Manufacturer:", manufacturers, manufacturer_var, 0)
-model_dropdown = create_dropdown("Model:", [], model_var, 1)  # Start with an empty list for models
-create_input("Year:", year_var, 2)
-create_input("Odometer (miles):", odometer_var, 3)
-create_dropdown("Fuel:", fuels, fuel_var, 4)
-create_dropdown("Transmission:", transmissions, transmission_var, 5)
+# Create GUI elements in the left frame
+create_dropdown(left_frame, "Manufacturer:", manufacturers, manufacturer_var, 0)
+model_dropdown = create_dropdown(left_frame, "Model:", [], model_var, 1)  # Start with an empty list for models
+create_input(left_frame, "Year:", year_var, 2)
+create_input(left_frame, "Odometer (miles):", odometer_var, 3)
+create_dropdown(left_frame, "Fuel:", fuels, fuel_var, 4)
+create_dropdown(left_frame, "Transmission:", transmissions, transmission_var, 5)
 
 # Bind the manufacturer dropdown to update the model dropdown
 manufacturer_var.trace("w", update_model_dropdown)
@@ -163,18 +170,22 @@ def calculate_similarity_score(row, user_inputs):
     return score
 
 # Output Area
-output_text = Text(root, wrap="word", height=15, width=50)
+output_text = Text(left_frame, wrap="word", height=15, width=50)
 output_text.grid(row=6, column=0, columnspan=2, padx=10, pady=10)
 
-# Frame for the graph
-graph_frame = Frame(root)
-graph_frame.grid(row=8, column=0, columnspan=2, padx=10, pady=10)
+# Frame for the graph (in the right frame)
+graph_frame = Frame(right_frame)
+graph_frame.pack(fill="both", expand=True)
 
 def show_depreciation_graph(estimated_price):
     """Show an interactive graph of depreciation."""
     # Clear the existing graph frame
     for widget in graph_frame.winfo_children():
         widget.destroy()
+
+    # Get the selected manufacturer and model
+    selected_manufacturer = manufacturer_var.get()
+    selected_model = model_var.get()
 
     current_year = datetime.now().year
     years = [current_year + i for i in range(11)]
@@ -184,7 +195,9 @@ def show_depreciation_graph(estimated_price):
     # Create the figure
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.plot(years, prices, marker='o', label="Depreciation Curve")
-    ax.set_title("Depreciation Over 10 Years")
+    
+    # Set dynamic title based on selected manufacturer and model
+    ax.set_title(f"Depreciation of {selected_manufacturer} {selected_model} Over 10 Years")
     ax.set_xlabel("Year")
     ax.set_ylabel("Price ($)")
     ax.legend()
@@ -313,7 +326,7 @@ def get_estimated_price():
     return estimation[0]
 
 # Add buttons
-Button(root, text="Estimate Price", command=estimate_price).grid(row=7, column=0, pady=20, padx=10, sticky="w")
-Button(root, text="Predict Depreciation", command=lambda: show_depreciation_graph(get_estimated_price())).grid(row=7, column=1, pady=20, padx=10, sticky="e")
+Button(left_frame, text="Estimate Price", command=estimate_price).grid(row=7, column=0, pady=20, padx=10, sticky="w")
+Button(left_frame, text="Predict Depreciation", command=lambda: show_depreciation_graph(get_estimated_price())).grid(row=7, column=1, pady=20, padx=10, sticky="e")
 # Start the GUI loop
 root.mainloop()
