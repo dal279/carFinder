@@ -4,11 +4,10 @@ import json
 from tkinter import Tk
 from tkinter.filedialog import askopenfilename, asksaveasfilename
 
-
 def clean_data(df):
     """Clean and preprocess the dataset."""
     # Drop irrelevant columns
-    columns_to_drop = ['url', 'region_url', 'VIN', 'image_url', 'posting_date', 'state', 'lat', 'long']
+    columns_to_drop = ['url', 'region_url', 'VIN', 'image_url', 'posting_date', 'state', 'lat', 'long', 'title_status', 'description', 'paint_color', 'drive']
     df = df.drop(columns=columns_to_drop, errors='ignore')  # Ignore columns not present
 
     # Handle missing values
@@ -70,7 +69,7 @@ def main():
     metadata = extract_metadata(df_cleaned)
 
     # Randomly select a subset
-    subset = df_cleaned.sample(n=10000, random_state=42) if len(df_cleaned) > 10000 else df_cleaned
+    subset = df_cleaned.sample(n=100000, random_state=42) if len(df_cleaned) > 100000 else df_cleaned
 
     # Save the subset to a new file
     output_file = asksaveasfilename(title="Save Reduced CSV As", defaultextension=".csv", filetypes=[("CSV Files", "*.csv")])

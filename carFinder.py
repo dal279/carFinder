@@ -10,10 +10,9 @@ from sklearn.metrics import mean_squared_error
 
 # Paths for dataset and metadata
 script_dir = os.path.dirname(os.path.abspath(__file__))
-csv_file = os.path.join(script_dir, 'vehicleSample10000.csv')  # Cleaned CSV file
-metadata_file = os.path.join(script_dir, 'vehicleSample10000_metadata.json')  # Metadata JSON file
+csv_file = os.path.join(script_dir, 'vehicleSample100k.csv')  # Cleaned CSV file
+metadata_file = os.path.join(script_dir, 'vehicleSample100k_metadata.json')  # Metadata JSON file
 database_file = os.path.join(script_dir, 'car_data.db')  # SQLite database file
-
 
 # Function to calculate the hash of a file
 def calculate_file_hash(file_path):
@@ -95,9 +94,7 @@ with open(metadata_file, 'r') as f:
 manufacturers = metadata['manufacturer']
 fuels = metadata['fuel']
 transmissions = metadata['transmission']
-drives = metadata['drive']
 types = metadata['type']
-
 
 # Tkinter GUI setup
 root = Tk()
@@ -108,11 +105,9 @@ root.geometry("400x500")
 manufacturer_var = StringVar()
 model_var = StringVar()
 year_var = IntVar()
-condition_var = StringVar()
 odometer_var = IntVar()
 fuel_var = StringVar()
 transmission_var = StringVar()
-drive_var = StringVar()
 type_var = StringVar()
 
 # Helper function to create labels and widgets
@@ -132,11 +127,9 @@ def create_input(label_text, variable, row):
 create_dropdown("Manufacturer:", manufacturers, manufacturer_var, 0)
 model_dropdown = create_dropdown("Model:", [], model_var, 1)  # Start with an empty list for models
 create_input("Year:", year_var, 2)
-create_dropdown("Condition:", ["excellent", "new", "like new", "good", "fair"], condition_var, 3)
 create_input("Odometer (miles):", odometer_var, 4)
 create_dropdown("Fuel:", fuels, fuel_var, 5)
 create_dropdown("Transmission:", transmissions, transmission_var, 6)
-create_dropdown("Drive:", drives, drive_var, 7)
 create_dropdown("Type:", types, type_var, 8)
 
 # Bind the manufacturer dropdown to update the model dropdown
@@ -148,11 +141,9 @@ def predict_price():
         "manufacturer": manufacturer_var.get(),
         "model": model_var.get(),
         "year": year_var.get(),
-        "condition": condition_var.get(),
         "odometer": odometer_var.get(),
         "fuel": fuel_var.get(),
         "transmission": transmission_var.get(),
-        "drive": drive_var.get(),
         "type": type_var.get(),
     }
 
@@ -186,7 +177,7 @@ def predict_price():
         messagebox.showerror("Error", "Not enough similar data to make a reliable prediction.")
         return
 
-    features = ['manufacturer', 'model', 'year', 'condition', 'odometer', 'fuel', 'transmission', 'drive', 'type']
+    features = ['manufacturer', 'model', 'year', 'odometer', 'fuel', 'transmission', 'type']
     X = pd.get_dummies(top_similar_records[features], drop_first=True)
     y = top_similar_records['price']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
