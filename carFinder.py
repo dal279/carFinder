@@ -187,13 +187,20 @@ def show_depreciation_graph(estimated_price):
     ax.set_ylabel("Price ($)")
     ax.legend()
 
-    # Interactive cursor
-    mplcursors.cursor(ax, hover=True)
+    # Interactive cursor with custom labels
+    cursor = mplcursors.cursor(ax, hover=True)
+
+    @cursor.connect("add")
+    def on_add(sel):
+        # Update the hover label with x and y-axis labels
+        x, y = sel.target
+        sel.annotation.set_text(f"Years: {x:.0f}\nPrice: ${y:.2f}")
 
     # Embed the graph into Tkinter
     canvas = FigureCanvasTkAgg(fig, master=graph_frame)
     canvas.draw()
     canvas.get_tk_widget().pack()
+
 
 def estimate_price():
     output_text.delete("1.0", END)  # Clear previous output
