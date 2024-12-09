@@ -3,11 +3,14 @@ import sqlite3
 import os
 import hashlib
 import json
-from tkinter import Tk, Label, Entry, Button, StringVar, IntVar, ttk, Text, END
+from tkinter import Tk, Label, Entry, Button, StringVar, IntVar, ttk, messagebox
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
-from difflib import SequenceMatcher  # For string similarity
+from difflib import SequenceMatcher
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
+import numpy as np
 
 # Paths for dataset and metadata
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -96,7 +99,7 @@ types = metadata['type']
 # Tkinter GUI setup
 root = Tk()
 root.title("Car Price Predictor")
-root.geometry("500x600")
+root.geometry("800x600")
 
 # Input Variables
 manufacturer_var = StringVar()
@@ -158,14 +161,10 @@ def calculate_similarity_score(row, user_inputs):
 
     return score
 
-# Output Area
-output_text = Text(root, wrap="word", height=15, width=50)
-output_text.grid(row=10, column=0, columnspan=2, padx=10, pady=10)
+output_label = Label(root, text="", justify="left")
+output_label.grid(row=10, column=0, columnspan=2, pady=10)
 
-# Prediction function
 def predict_price():
-    output_text.delete("1.0", END)  # Clear previous output
-
     user_inputs = {
         "manufacturer": manufacturer_var.get(),
         "model": model_var.get(),
@@ -186,7 +185,7 @@ def predict_price():
 
     # Ensure sufficient data exists
     if len(df) < 10:
-        output_text.insert(END, "Error: Not enough data to create a reliable model.")
+        output_label.config(text="Not enough data to create a reliable model.")
         return
 
     # Train the model based on similarity
@@ -195,7 +194,7 @@ def predict_price():
 
     top_similar_records = df[df['similarity_score'] > 0].head(100)
     if len(top_similar_records) < 10:
-        output_text.insert(END, "Error: Not enough similar data to make a reliable prediction.")
+        output_label.config(text="Not enough similar data to make a reliable prediction.")
         return
 
     features = ['manufacturer', 'model', 'year', 'odometer', 'fuel', 'transmission']
@@ -211,20 +210,39 @@ def predict_price():
 
     try:
         prediction = model.predict(user_df)
-        similar_cars = top_similar_records.loc[
-            (top_similar_records['price'] >= prediction[0] * 0.9) &
-            (top_similar_records['price'] <= prediction[0] * 1.1),
-            ['manufacturer', 'model', 'year', 'price']
-        ]
+        similar_cars = top_similar_records[['manufacturer', 'model', 'year', 'price']].head(10)
+        similar_cars_list = "\n".join(
+            f"{row['year']} {row['manufacturer']} {row['model']}: ${row['price']:.2f}"
+            for _, row in similar_cars.iterrows()
+        )
 
-        output_text.insert(END, f"Estimated price: ${prediction[0]:.2f}\n\n")
-        output_text.insert(END, "Similar cars:\n")
+        output_text = f"Estimated price: ${prediction[0]:.2f}\n\nSimilar cars:\n{similar_cars_list}"
+        output_label.config(text=output_text)
 
-        for _, row in similar_cars.iterrows():
-            output_text.insert(END, f"{row['year']} {row['manufacturer']} {row['model']}: ${row['price']:.2f}\n")
+        # Plot depreciation graph
+        depreciation_years = np.arange(1, 11)
+        depreciation_values = prediction[0] * (0.85 ** depreciation_years)
+
+        fig, ax = plt.subplots()
+        ax.plot(depreciation_years, depreciation_values, marker='o')
+        ax.set_title("Depreciation Over 10 Years")
+        ax.set_xlabel("Years")
+        ax.set_ylabel("Price ($)")
+
+        def format_coord(x, y):
+            return f"Year: {int(x)}, Price: ${y:.2f}"
+
+        ax.format_coord = format_coord
+
+        for i, txt in enumerate(depreciation_values):
+            ax.annotate(f"${txt:.0f}", (depreciation_years[i], depreciation_values[i]), textcoords="offset points", xytext=(0,5), ha='center')
+
+        canvas = FigureCanvasTkAgg(fig, root)
+        canvas.get_tk_widget().grid(row=11, column=0, columnspan=2, pady=10)
+        canvas.draw()
 
     except Exception as e:
-        output_text.insert(END, f"Error during prediction: {e}")
+        output_label.config(text=f"Error during prediction: {e}")
 
 # Add a Submit button
 Button(root, text="Predict Price", command=predict_price).grid(row=9, column=0, columnspan=2, pady=20)
