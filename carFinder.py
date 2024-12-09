@@ -7,6 +7,8 @@ from tkinter import Tk, Label, Entry, Button, StringVar, IntVar, ttk, messagebox
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
+from difflib import SequenceMatcher  # For string similarity
+
 
 # Paths for dataset and metadata
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -130,10 +132,36 @@ create_input("Year:", year_var, 2)
 create_input("Odometer (miles):", odometer_var, 4)
 create_dropdown("Fuel:", fuels, fuel_var, 5)
 create_dropdown("Transmission:", transmissions, transmission_var, 6)
-create_dropdown("Type:", types, type_var, 8)
 
 # Bind the manufacturer dropdown to update the model dropdown
 manufacturer_var.trace("w", update_model_dropdown)
+
+def calculate_string_similarity(str1, str2):
+        """Calculate string similarity using SequenceMatcher."""
+        return SequenceMatcher(None, str1, str2).ratio()
+
+def calculate_similarity_score(row, user_inputs):
+    """Calculate a similarity score for each row based on user inputs."""
+    score = 0
+    weights = {
+        "manufacturer": 1,
+        "model": 3,  # Higher weight for model similarity
+        "year": 2,
+        "odometer": 2,
+        "fuel": 1,
+        "transmission": 1,
+    }
+
+    for key, value in user_inputs.items():
+        if key in row and pd.notna(row[key]):
+            if key == "model":
+                # String similarity for model field
+                similarity = calculate_string_similarity(str(row[key]).lower(), str(value).lower())
+                score += weights[key] * similarity
+            elif str(row[key]).lower() == str(value).lower():
+                score += weights[key]
+
+    return score
 
 # Prediction function
 def predict_price():
@@ -144,7 +172,6 @@ def predict_price():
         "odometer": odometer_var.get(),
         "fuel": fuel_var.get(),
         "transmission": transmission_var.get(),
-        "type": type_var.get(),
     }
 
     # Filter out empty inputs
@@ -162,12 +189,7 @@ def predict_price():
         return
 
     # Train the model based on similarity
-    def calculate_similarity_score(row, user_inputs):
-        score = 0
-        for key, value in user_inputs.items():
-            if key in row and pd.notna(row[key]) and str(row[key]).lower() == str(value).lower():
-                score += 1
-        return score
+    from difflib import SequenceMatcher  # For string similarity
 
     df['similarity_score'] = df.apply(calculate_similarity_score, axis=1, args=(filtered_inputs,))
     df = df.sort_values(by='similarity_score', ascending=False)
@@ -177,7 +199,7 @@ def predict_price():
         messagebox.showerror("Error", "Not enough similar data to make a reliable prediction.")
         return
 
-    features = ['manufacturer', 'model', 'year', 'odometer', 'fuel', 'transmission', 'type']
+    features = ['manufacturer', 'model', 'year', 'odometer', 'fuel', 'transmission']
     X = pd.get_dummies(top_similar_records[features], drop_first=True)
     y = top_similar_records['price']
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
