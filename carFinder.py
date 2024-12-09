@@ -3,7 +3,7 @@ import sqlite3
 import os
 import hashlib
 import json
-from tkinter import Tk, Label, Entry, Button, StringVar, IntVar, ttk, messagebox
+from tkinter import Tk, Label, Entry, Button, StringVar, IntVar, ttk, Text, END
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error
@@ -96,7 +96,7 @@ types = metadata['type']
 # Tkinter GUI setup
 root = Tk()
 root.title("Car Price Predictor")
-root.geometry("400x500")
+root.geometry("500x600")
 
 # Input Variables
 manufacturer_var = StringVar()
@@ -158,8 +158,14 @@ def calculate_similarity_score(row, user_inputs):
 
     return score
 
+# Output Area
+output_text = Text(root, wrap="word", height=15, width=50)
+output_text.grid(row=10, column=0, columnspan=2, padx=10, pady=10)
+
 # Prediction function
 def predict_price():
+    output_text.delete("1.0", END)  # Clear previous output
+
     user_inputs = {
         "manufacturer": manufacturer_var.get(),
         "model": model_var.get(),
@@ -180,7 +186,7 @@ def predict_price():
 
     # Ensure sufficient data exists
     if len(df) < 10:
-        messagebox.showerror("Error", "Not enough data to create a reliable model.")
+        output_text.insert(END, "Error: Not enough data to create a reliable model.")
         return
 
     # Train the model based on similarity
@@ -189,7 +195,7 @@ def predict_price():
 
     top_similar_records = df[df['similarity_score'] > 0].head(100)
     if len(top_similar_records) < 10:
-        messagebox.showerror("Error", "Not enough similar data to make a reliable prediction.")
+        output_text.insert(END, "Error: Not enough similar data to make a reliable prediction.")
         return
 
     features = ['manufacturer', 'model', 'year', 'odometer', 'fuel', 'transmission']
@@ -204,32 +210,21 @@ def predict_price():
     user_df = user_df.reindex(columns=X_train.columns, fill_value=0)
 
     try:
-        prediction = model.predict(user_df)[0]
-
-        # Filter for cars with prices similar to the predicted price
-        price_range = 0.2 * prediction  # ±20% of the predicted price
-        similar_priced_cars = df[
-            (df['price'] >= prediction - price_range) &
-            (df['price'] <= prediction + price_range)
+        prediction = model.predict(user_df)
+        similar_cars = top_similar_records.loc[
+            (top_similar_records['price'] >= prediction[0] * 0.9) &
+            (top_similar_records['price'] <= prediction[0] * 1.1),
+            ['manufacturer', 'model', 'year', 'price']
         ]
 
-        # Combine similarity and price filtering
-        recommended_cars = similar_priced_cars.sort_values(
-            by=['similarity_score'], ascending=False
-        ).head(10)
+        output_text.insert(END, f"Estimated price: ${prediction[0]:.2f}\n\n")
+        output_text.insert(END, "Similar cars:\n")
 
-        # Generate a list of recommended cars
-        similar_cars_list = "\n".join(
-            f"{row['year']} {row['manufacturer']} {row['model']}: ${row['price']:.2f}"
-            for _, row in recommended_cars.iterrows()
-        )
+        for _, row in similar_cars.iterrows():
+            output_text.insert(END, f"{row['year']} {row['manufacturer']} {row['model']}: ${row['price']:.2f}\n")
 
-        messagebox.showinfo(
-            "Prediction",
-            f"Estimated price: ${prediction:.2f}\n\nSimilar cars:\n{similar_cars_list}"
-        )
     except Exception as e:
-        messagebox.showerror("Error", f"Error during prediction: {e}")
+        output_text.insert(END, f"Error during prediction: {e}")
 
 # Add a Submit button
 Button(root, text="Predict Price", command=predict_price).grid(row=9, column=0, columnspan=2, pady=20)
