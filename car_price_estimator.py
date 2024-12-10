@@ -277,7 +277,11 @@ def estimate_price():
 
     try:
         estimation = model.predict(user_df)
-        output_text.insert(END, f"Estimated price: ${estimation[0]:.2f}\n\n")
+        
+        # Ensure the estimated price is not negative
+        estimated_price = max(estimation[0], 0)
+
+        output_text.insert(END, f"Estimated price: ${estimated_price:.2f}\n\n")
 
         # Display Model Evaluation Metrics if checkbox is checked
         if show_model_metrics.get():
@@ -299,8 +303,8 @@ def estimate_price():
 
         # Find similar cars
         similar_cars = top_similar_records.loc[
-            (top_similar_records['price'] >= estimation[0] * 0.9) &
-            (top_similar_records['price'] <= estimation[0] * 1.1),
+            (top_similar_records['price'] >= estimated_price * 0.9) &
+            (top_similar_records['price'] <= estimated_price * 1.1),
             ['manufacturer', 'model', 'year', 'price', 'odometer']
         ]
 
